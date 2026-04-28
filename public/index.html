@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PromptForge — 3D 회전 영상 프롬프트 생성기</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&family=Pretendard:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --surface2: #1a1a24;
+    --border: rgba(255,255,255,0.07); --accent: #8b5cf6; --accent2: #06b6d4;
+    --text: #f0f0f8; --text2: #9090b0; --text3: #5a5a7a;
+    --radius: 14px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Pretendard', sans-serif;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(139,92,246,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.04) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none;
+  }
+  .orb { position: fixed; border-radius: 50%; filter: blur(130px); pointer-events: none; }
+  .orb1 { width: 500px; height: 500px; background: rgba(139,92,246,0.13); top: -150px; left: -150px; }
+  .orb2 { width: 400px; height: 400px; background: rgba(6,182,212,0.08); bottom: -100px; right: -100px; }
+  .wrap { position: relative; z-index: 1; width: 100%; max-width: 520px; padding: 40px 24px 60px; }
+  header { text-align: center; margin-bottom: 36px; }
+  .logo { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+  .logo-text { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; background: linear-gradient(90deg, #fff, #9090b0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  h1 { font-family: 'Syne', sans-serif; font-size: clamp(24px, 5vw, 36px); font-weight: 800; line-height: 1.15; letter-spacing: -1px; background: linear-gradient(135deg, #fff 20%, #8b5cf6 60%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; }
+  .subtitle { font-size: 14px; color: var(--text2); font-weight: 300; }
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 14px; }
+  .opt-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  .upload-zone { border: 1.5px dashed rgba(139,92,246,0.35); border-radius: var(--radius-sm); padding: 32px 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(139,92,246,0.03); position: relative; }
+  .upload-zone:hover { border-color: var(--accent); background: rgba(139,92,246,0.08); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  #preview-img { width: 100%; max-height: 200px; object-fit: contain; border-radius: var(--radius-sm); border: 0.5px solid var(--border); margin-top: 12px; display: none; }
+  .dir-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 220px; margin: 0 auto; }
+  .dir-btn { aspect-ratio: 1; background: var(--surface2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; color: var(--text); }
+  .dir-btn:hover { border-color: rgba(255,255,255,0.2); }
+  .dir-btn.on { background: rgba(139,92,246,0.18); border-color: var(--accent); }
+  .dir-center { aspect-ratio: 1; background: var(--surface2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 18px; opacity: 0.35; }
+  .spd-wrap { display: flex; gap: 8px; }
+  .spd-btn { flex: 1; padding: 10px 4px; background: var(--surface2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: 'Pretendard', sans-serif; color: var(--text2); cursor: pointer; text-align: center; transition: all 0.15s; }
+  .spd-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .spd-btn.on { background: rgba(6,182,212,0.13); border-color: var(--accent2); color: #67e8f9; }
+  #gen-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, var(--accent), #6d28d9); border: none; border-radius: var(--radius-sm); color: #fff; font-size: 15px; font-weight: 500; font-family: 'Pretendard', sans-serif; cursor: pointer; transition: opacity 0.2s, transform 0.2s; margin-bottom: 14px; }
+  #gen-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  #gen-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  #loading-bar { display: none; height: 2px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-bottom: 14px; }
+  #loading-bar::after { content: ''; display: block; height: 100%; width: 40%; background: linear-gradient(90deg, var(--accent), var(--accent2)); animation: sl 1s infinite; }
+  @keyframes sl { 0%{margin-left:-40%} 100%{margin-left:100%} }
+  #result-area { display: none; background: var(--surface); border: 0.5px solid rgba(139,92,246,0.35); border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden; }
+  #result-area::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+  .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .result-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  .copy-btn { padding: 5px 14px; background: rgba(139,92,246,0.15); border: 0.5px solid var(--accent); border-radius: 100px; color: #c4b5fd; font-size: 12px; font-family: 'Pretendard', sans-serif; cursor: pointer; }
+  #result-text { font-family: 'DM Mono', monospace; font-size: 13px; line-height: 1.85; color: var(--text); word-break: break-word; }
+  footer { text-align: center; margin-top: 36px; font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="wrap">
+  <header>
+    <div class="logo"><div class="logo-icon">✦</div><span class="logo-text">PromptForge</span></div>
+    <h1>3D 회전 영상<br>프롬프트 생성기</h1>
+    <p class="subtitle">이미지를 올리면 AI가 3D 회전 영상 프롬프트를 만들어드려요</p>
+  </header>
+
+  <div class="card">
+    <div class="opt-label">01 — 참고 이미지</div>
+    <div class="upload-zone" ondragover="dg(event,true)" ondragleave="dg(event,false)" ondrop="dp(event)">
+      <input type="file" id="fi" accept="image/*" onchange="load(this.files[0])">
+      <div style="font-size: 14px; color: var(--text2);">이미지를 클릭하거나 드래그</div>
+      <div style="font-size: 12px; color: var(--text3); margin-top: 6px;">JPG · PNG · WEBP</div>
+    </div>
+    <img id="preview-img" src="" alt="미리보기">
+  </div>
+
+  <div class="card">
+    <div class="opt-label">02 — 회전 방향</div>
+    <div class="dir-grid">
+      <button class="dir-btn" onclick="sd(this,'rotating diagonally upward to the left')">↖</button>
+      <button class="dir-btn" onclick="sd(this,'rotating upward, tilting forward')">↑</button>
+      <button class="dir-btn" onclick="sd(this,'rotating diagonally upward to the right')">↗</button>
+      <button class="dir-btn" onclick="sd(this,'rotating counterclockwise to the left')">←</button>
+      <div class="dir-center">◎</div>
+      <button class="dir-btn on" onclick="sd(this,'rotating clockwise to the right')">→</button>
+      <button class="dir-btn" onclick="sd(this,'rotating diagonally downward to the left')">↙</button>
+      <button class="dir-btn" onclick="sd(this,'rotating downward, tilting backward')">↓</button>
+      <button class="dir-btn" onclick="sd(this,'rotating diagonally downward to the right')">↘</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="opt-label">03 — 회전수</div>
+    <div class="spd-wrap">
+      <button class="spd-btn on" onclick="ss(this,1)">1바퀴</button>
+      <button class="spd-btn" onclick="ss(this,2)">2바퀴</button>
+      <button class="spd-btn" onclick="ss(this,3)">3바퀴</button>
+      <button class="spd-btn" onclick="ss(this,4)">4바퀴</button>
+      <button class="spd-btn" onclick="ss(this,5)">5바퀴</button>
+    </div>
+  </div>
+
+  <button id="gen-btn" onclick="gen()" disabled>✦ 프롬프트 생성하기</button>
+  <div id="loading-bar"></div>
+
+  <div id="result-area">
+    <div class="result-header">
+      <span class="result-label">생성된 프롬프트</span>
+      <button class="copy-btn" id="cp-btn" onclick="cp()">복사하기</button>
+    </div>
+    <div id="result-text"></div>
+  </div>
+
+  <footer>PromptForge — Built with Claude AI</footer>
+</div>
+
+<script>
+let b64 = null, mime = 'image/jpeg';
+let dirVal = 'rotating clockwise to the right', spdCount = 1;
+
+function dg(e, on) { e.preventDefault(); }
+function dp(e) { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) load(f); }
+
+function load(file) {
+  if (!file) return;
+  mime = file.type || 'image/jpeg';
+  const r = new FileReader();
+  r.onload = e => {
+    b64 = e.target.result.split(',')[1];
+    const img = document.getElementById('preview-img');
+    img.src = e.target.result; img.style.display = 'block';
+    document.getElementById('gen-btn').disabled = false;
+    document.getElementById('result-area').style.display = 'none';
+  };
+  r.readAsDataURL(file);
+}
+
+function sd(btn, val) {
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on'); dirVal = val;
+}
+
+function ss(btn, n) {
+  document.querySelectorAll('.spd-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on'); spdCount = n;
+}
+
+async function gen() {
+  if (!b64) return;
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true; btn.textContent = '분석 중...';
+  document.getElementById('loading-bar').style.display = 'block';
+  document.getElementById('result-area').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64: b64, imageMime: mime, dirVal, spdCount })
+    });
+    const data = await res.json();
+    document.getElementById('result-text').textContent = data.result || '생성 실패. 다시 시도해주세요.';
+    document.getElementById('result-area').style.display = 'block';
+  } catch(e) {
+    document.getElementById('result-text').textContent = '오류가 발생했습니다. 다시 시도해주세요.';
+    document.getElementById('result-area').style.display = 'block';
+  }
+
+  document.getElementById('loading-bar').style.display = 'none';
+  btn.disabled = false; btn.textContent = '✦ 다시 생성하기';
+}
+
+function cp() {
+  navigator.clipboard.writeText(document.getElementById('result-text').textContent).then(() => {
+    const b = document.getElementById('cp-btn');
+    b.textContent = '복사됨 ✓';
+    setTimeout(() => b.textContent = '복사하기', 2000);
+  });
+}
+</script>
+</body>
+</html>
